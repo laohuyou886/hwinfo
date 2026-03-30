@@ -10,7 +10,7 @@ if (WIN32)
 endif()
 
 if(MSVC)
-    add_compile_options(/W4 /WX)
+    add_compile_options(/W4 /WX /wd4819)
 else()
     add_compile_options(-Wall -Wextra -Werror -Wpedantic)
 endif()
