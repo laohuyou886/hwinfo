@@ -34,6 +34,8 @@
 #ifdef _WIN32
 #ifdef HWINFO_EXPORTS
 #define HWINFO_API __declspec(dllexport)
+#elif defined(HWINFO_STATIC)
+#define HWINFO_API
 #else
 #define HWINFO_API __declspec(dllimport)
 #endif

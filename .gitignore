@@ -1,6 +1,8 @@
 /**/.vscode/**
 /**/build/**
 /**/build_linux/**
+/**/build_linux_static/**
+/**/build_static/**
 /.vs
 /CMakeSettings.json
 /.cache/
