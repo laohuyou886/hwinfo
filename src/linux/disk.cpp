@@ -31,29 +31,53 @@ std::string read_file(const std::string& path) {
 
 // _____________________________________________________________________________________________________________________
 std::string getDiskVendor(const std::filesystem::path& path) {
-  std::string result = read_file(path / "device/vendor");
-  if (result.empty()) {
+  try {
+    auto vendorPath = path / "device/vendor";
+    if (!std::filesystem::exists(vendorPath)) {
+      return "<unknown>";
+    }
+    std::string result = read_file(vendorPath);
+    if (result.empty()) {
+      return "<unknown>";
+    }
+    return result;
+  } catch (...) {
     return "<unknown>";
   }
-  return result;
 }
 
 // _____________________________________________________________________________________________________________________
 std::string getDiskModel(const std::filesystem::path& path) {
-  std::string result = read_file(path / "device/model");
-  if (result.empty()) {
+  try {
+    auto modelPath = path / "device/model";
+    if (!std::filesystem::exists(modelPath)) {
+      return "<unknown>";
+    }
+    std::string result = read_file(modelPath);
+    if (result.empty()) {
+      return "<unknown>";
+    }
+    return result;
+  } catch (...) {
     return "<unknown>";
   }
-  return result;
 }
 
 // _____________________________________________________________________________________________________________________
 std::string getDiskSerialNumber(const std::filesystem::path& path) {
-  std::string result = read_file(path / "device/serial");
-  if (result.empty()) {
+  try {
+    auto serialPath = path / "device/serial";
+    if (!std::filesystem::exists(serialPath)) {
+      return "<unknown>";
+    }
+    std::string result = read_file(serialPath);
+    if (result.empty()) {
+      return "<unknown>";
+    }
+    return result;
+  } catch (...) {
     return "<unknown>";
   }
-  return result;
 }
 
 // _____________________________________________________________________________________________________________________
@@ -67,50 +91,62 @@ uint64_t getDiskSize_Bytes(const std::filesystem::path& path) {
 }
 
 hwinfo::Disk::Interface getDiskUsbVersion(const std::filesystem::path& disk_sys_path) {
-  std::filesystem::path current = std::filesystem::canonical(disk_sys_path);
+  try {
+    std::filesystem::path current = std::filesystem::canonical(disk_sys_path);
 
-  while (current != "/" && current.has_parent_path()) {
-    if (std::filesystem::exists(current / "speed")) {
-      std::string speed_str = read_file(current / "speed");
-      if (speed_str.empty()) {
-        return hwinfo::Disk::Interface::USB;
-      }
-
-      try {
-        int speed = std::stoi(speed_str);
-        if (speed >= 80000) return hwinfo::Disk::Interface::USB4_80GBit;
-        if (speed >= 40000) return hwinfo::Disk::Interface::USB4_40GBit;
-        if (speed >= 20000) {
-          std::string ver = read_file(current / "version");
-          if (ver.find("4.") != std::string::npos) {
-            return hwinfo::Disk::Interface::USB4_20GBit;
-          }
-          return hwinfo::Disk::Interface::USB3_20GBit;
+    while (current != "/" && current.has_parent_path()) {
+      if (std::filesystem::exists(current / "speed")) {
+        std::string speed_str = read_file(current / "speed");
+        if (speed_str.empty()) {
+          return hwinfo::Disk::Interface::USB;
         }
-        if (speed >= 10000) return hwinfo::Disk::Interface::USB3_10GBit;
-        if (speed >= 5000) return hwinfo::Disk::Interface::USB3_5GBit;
-        if (speed == 480) return hwinfo::Disk::Interface::USB2;
-        if (speed < 480) return hwinfo::Disk::Interface::USB1;
-      } catch (...) {
-        return hwinfo::Disk::Interface::USB;
+
+        try {
+          int speed = std::stoi(speed_str);
+          if (speed >= 80000) return hwinfo::Disk::Interface::USB4_80GBit;
+          if (speed >= 40000) return hwinfo::Disk::Interface::USB4_40GBit;
+          if (speed >= 20000) {
+            std::string ver = read_file(current / "version");
+            if (ver.find("4.") != std::string::npos) {
+              return hwinfo::Disk::Interface::USB4_20GBit;
+            }
+            return hwinfo::Disk::Interface::USB3_20GBit;
+          }
+          if (speed >= 10000) return hwinfo::Disk::Interface::USB3_10GBit;
+          if (speed >= 5000) return hwinfo::Disk::Interface::USB3_5GBit;
+          if (speed == 480) return hwinfo::Disk::Interface::USB2;
+          if (speed < 480) return hwinfo::Disk::Interface::USB1;
+        } catch (...) {
+          return hwinfo::Disk::Interface::USB;
+        }
       }
+      current = current.parent_path();
     }
-    current = current.parent_path();
+  } catch (...) {
+    // Ignore filesystem errors
   }
   return hwinfo::Disk::Interface::USB;
 }
 
 // _____________________________________________________________________________________________________________________
 hwinfo::Disk::Interface getDiskInterface(const std::filesystem::path& path) {
-  std::string subsystem = std::filesystem::canonical(path / "device").string();
-  if (subsystem.find("nvme") != std::string::npos) {
-    return hwinfo::Disk::Interface::NVME;
-  } else if (subsystem.find("usb") != std::string::npos) {
-    return getDiskUsbVersion(path);
-  } else if (subsystem.find("ata") != std::string::npos) {
-    return hwinfo::Disk::Interface::SATA;
-  } else if (subsystem.find("scsi") != std::string::npos) {
-    return hwinfo::Disk::Interface::SCSI;
+  try {
+    auto devicePath = path / "device";
+    if (!std::filesystem::exists(devicePath)) {
+      return hwinfo::Disk::Interface::UNKNOWN;
+    }
+    std::string subsystem = std::filesystem::canonical(devicePath).string();
+    if (subsystem.find("nvme") != std::string::npos) {
+      return hwinfo::Disk::Interface::NVME;
+    } else if (subsystem.find("usb") != std::string::npos) {
+      return getDiskUsbVersion(path);
+    } else if (subsystem.find("ata") != std::string::npos) {
+      return hwinfo::Disk::Interface::SATA;
+    } else if (subsystem.find("scsi") != std::string::npos) {
+      return hwinfo::Disk::Interface::SCSI;
+    }
+  } catch (...) {
+    // Ignore filesystem errors for device mapper (dm-0, etc.)
   }
   return hwinfo::Disk::Interface::UNKNOWN;
 }
@@ -127,8 +163,8 @@ std::vector<Disk> getAllDisks() {
   std::uint32_t id = 0;
   for (const auto& entry : std::filesystem::directory_iterator("/sys/class/block")) {
     std::string name = entry.path().filename().string();
-    if (std::filesystem::exists(entry.path() / "partition") || name.find("loop") == 0 || name.find("ram") == 0) {
-      // skip partitions, loop devices and virtual devices
+    if (std::filesystem::exists(entry.path() / "partition") || name.find("loop") == 0 || name.find("ram") == 0 || name.find("dm-") == 0) {
+      // skip partitions, loop devices, ram devices and device mapper (dm-*, LVM/RAID)
       continue;
     }
     Disk disk;
